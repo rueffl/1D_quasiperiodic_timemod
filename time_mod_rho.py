@@ -235,8 +235,8 @@ class rho_tdep:
             The 2Nx2N matrix defining the Dirichlet-to-Neumann map.
         """
         def Ak(l, k):
-            return np.asarray([[-1*k* np.cos(k * l) / np.sin(k * l), k/ np.sin(k * l)],
-                               [k / np.sin(k * l), -1*k* np.cos(k * l) / np.sin(k * l)]])
+            return np.asarray([[-k* np.cos(k * l) / np.sin(k * l), k/ np.sin(k * l)],
+                               [k / np.sin(k * l), -k* np.cos(k * l) / np.sin(k * l)]])
     
         k = (self.omega+n*self.O)/self.vb
         T = lg.block_diag(-k[-1]* np.cos(k[-1] * self.lij[-1]) / np.sin(k[-1]* self.lij[-1]),
@@ -274,14 +274,14 @@ class rho_tdep:
         def V(m):
             km = (self.omega+m*self.O)/self.vb
             V = lg.block_diag(*([[np.exp(1j*km[i]*self.xim[i]), np.exp(-1j*km[i]*self.xim[i])],
-                                      [np.exp(1j*km[i]*self.xip[i]), np.exp(-1j*km[i]*self.xipm[i])]]
+                                      [np.exp(1j*km[i]*self.xip[i]), np.exp(-1j*km[i]*self.xip[i])]]
                                       for i in range(self.N)))
             return V
         
         A = np.zeros((M*2*self.N,M*2*self.N),dtype=np.complex)
-        G_m1 = As[0]*G(n-1)
-        G_0 = As[1]*G(n)
-        G_p1 = As[2]*G(n+1)
+        G_m1 = G(n-1)
+        G_0 = G(n)
+        G_p1 = G(n+1)
         V_m1 = V(n-1)
         V_0 = V(n)
         V_p1 = V(n+1)
@@ -289,13 +289,17 @@ class rho_tdep:
         T_0 = self.get_DirichletNeumann_matrix(alpha, n)
         T_p1 = self.get_DirichletNeumann_matrix(alpha, n+1)
         
-        A[0:2*self.N,0:2*self.N] = G_m1-self.delta*T_m1.dot(V_m1)
-        A[2*self.N:4*self.N,2*self.N:4*self.N] = G_0-self.delta*T_0.dot(V_0)
-        A[4*self.N:6*self.N,4*self.N:6*self.N] = G_p1-self.delta*T_p1.dot(V_p1)
-        A[0:2*self.N,2*self.N:4*self.N] = G_0
-        A[2*self.N:4*self.N,0:2*self.N] = G_m1
-        A[2*self.N:4*self.N,4*self.N:6*self.N] = G_p1
-        A[4*self.N:6*self.N,2*self.N:4*self.N] = G_0
+        A[0*self.N:2*self.N,4*self.N:6*self.N] = As[1]*G_m1-self.delta*T_p1.dot(V_m1)
+        A[2*self.N:4*self.N,2*self.N:4*self.N] = As[1]*G_0-self.delta*T_0.dot(V_0)
+        A[4*self.N:6*self.N,0*self.N:2*self.N] = As[1]*G_p1-self.delta*T_p1.dot(V_p1)
+        A[0*self.N:2*self.N,2*self.N:4*self.N] = As[0]*G_0
+        A[2*self.N:4*self.N,0*self.N:2*self.N] = As[0]*G_p1
+        A[2*self.N:4*self.N,4*self.N:6*self.N] = As[2]*G_m1
+        A[4*self.N:6*self.N,2*self.N:4*self.N] = As[2]*G_0
+        
+        if (A[2*self.N:4*self.N,0*self.N:2*self.N] == np.zeros((2*self.N,2*self.N))).all():
+            if (A[2*self.N:4*self.N,4*self.N:6*self.N] == np.zeros((2*self.N,2*self.N))).all():
+                A = A[2*self.N:4*self.N,2*self.N:4*self.N]
         
         return A
         
@@ -322,8 +326,9 @@ class rho_tdep:
         
         if sol is None:
             A = self.getMatcalA(As, alpha)
-            sol = np.linalg.solve(A, np.zeros(self.N * 2*(2*M+1),dtype=np.complex)) # Solve the linear system (3.3) to get the coefficients a_i and b_i
-            sol = sol[2*self.N:4*self.N]
+            sol = np.linalg.solve(A, np.zeros(A.shape[0],dtype=np.complex)) # Solve the linear system (3.3) to get the coefficients a_i and b_i
+            if sol.shape[0] != 2*self.N:
+                sol = sol[2*self.N:4*self.N]
 
         def u(x):
             for (i, xim, xip) in zip(range(self.N), self.xipmCol[:, 0], self.xipmCol[:, 1]):
@@ -594,7 +599,7 @@ def muller(N, alpha, delta, vb, v, omega, O, A, li=None, lij=None):
         
 
     freqs, vmodes = wavepb.resonantfrequencies(v, vb, delta)
-    # freqs = np.linspace(0.1,1,num=1*wavepb.N)
+    # freqs = np.linspace(0.1,1.5,num=1*wavepb.N)
     roots = []
     for i, omegai in enumerate(freqs):
         xk = [omegai*(1+0.01*np.exp(1j*k*2*np.pi/3)) for k in (0,1,2)] # Define an initial guess for Muller's method
@@ -603,7 +608,11 @@ def muller(N, alpha, delta, vb, v, omega, O, A, li=None, lij=None):
         print(f"Initial guess: {omegai}")
         print(f"Root found: {root}   Value: {np.abs(f(root))}")
         roots.append(root)
-        wavepb.getu(A, alpha, sol=wavepb.sol[2*wavepb.N:4*wavepb.N]) # Computes the total wave field which solves the exterior problem
+        if wavepb.sol.shape[0] == 2*wavepb.N:
+            sol = wavepb.sol
+        else:
+            sol=wavepb.sol[2*wavepb.N:4*wavepb.N]
+        wavepb.getu(A, alpha, sol) # Computes the total wave field which solves the exterior problem
         wavepb.plot_u(alpha=alpha, animate=False) # Plots the total wave field u_i(x) corresponding to \omega_i
         plt.xlabel('$x$')
         plt.ylabel(f'$u_{{i}}(x)$')
@@ -629,7 +638,7 @@ def muller(N, alpha, delta, vb, v, omega, O, A, li=None, lij=None):
     sol = np.array([1]*2*N)
     wavepb.omega = 0
     wavepb.k=0
-    wavepb.kb=0
+    wavepb.kb=np.array([0]*N)
     wavepb.getu(A, alpha)
     wavepb.plot_u(alpha)
     plt.xlabel('$x$')
@@ -651,16 +660,15 @@ def muller(N, alpha, delta, vb, v, omega, O, A, li=None, lij=None):
     return np.asarray(roots)
 
 
-N = 3
+N = 4
 delta = 0.1
-vb = np.array([1,2,1])
+vb = np.array([1,2,1,2])
 v = 0.8 
 omega = np.sqrt(delta)
-M = 5
-# O = 2*np.sqrt(delta) 
-O = 0.2
+O = 2*np.sqrt(delta) 
+# O = 0.21
 # O = 1
-epsilon = 0
+epsilon = 1
 phi = 0.1
 A = [epsilon*np.exp(-1j*phi),1,epsilon*np.exp(1j*phi)]
 # A = [1,1,1]
@@ -670,12 +678,12 @@ L = np.sum(li) + np.sum(lij)
 alpha = 0.001
 
 assert len(li) == N, f"There are {N} resonators, thus, li must have {N} elements and not {len(li)} elements."
-assert len(lij) == N-1, f"There are {N} resonators, thus, li must have {N-1} elements66 and not {len(lij)} elements."
+assert len(lij) == N-1, f"There are {N} resonators, thus, li must have {N-1} elements and not {len(lij)} elements."
+assert len(vb) == N, f"There are {N} resonators, thus, vb must have {N} elements and not {len(vb)} elements."
 
-muller(N, alpha, delta, vb, v, omega, O, A, li, lij)
+# muller(N, alpha, delta, vb, v, omega, O, A, li, lij)
 
-# Plot \omega_1 as a function od \delta
-sample_points = 50
+sample_points = 100
 alphas = np.linspace(-np.pi / L, np.pi / L, sample_points)
 oms =np.zeros((sample_points,N), dtype=complex)
 i = 0
