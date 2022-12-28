@@ -51,14 +51,14 @@ class Quasiperiodic:
         if N==1:
             self.li = np.array([1])
             
-        Ls = np.zeros((N+N-1,)) # Create a list of the lengths of resonators and the lengths between to adjacent resonators
+        Ls = np.zeros((2*self.N)) # Create a list of the lengths of resonators and the lengths between to adjacent resonators
         Ls[::2] = self.li
         Ls[1::2] = self.lij
         self.L = np.sum(self.li) + np.sum(self.lij)
     
         self.xipm = np.insert(np.cumsum(Ls), 0, 0) # Array of the coordinates x_i^- and x_i^+
-    
-        self.xipmCol = np.column_stack((self.xipm[0::2], self.xipm[1::2]))
+
+        self.xipmCol = np.column_stack((self.xipm[0:-2:2], self.xipm[1::2]))
         self.xim = self.xipmCol[:, 0] # Coordinates x_i^+
         self.xip = self.xipmCol[:, 1] # Coordinates x_i^+
     
@@ -87,7 +87,7 @@ class Quasiperiodic:
         Returns
         -------
         None.
-
+        
         """
         self.alpha = alpha
         self.v = v # Wavespeed in the background medium
@@ -105,8 +105,8 @@ class Quasiperiodic:
         
         Parameters
         ----------
-        sampling_points : FLOAT, default=100
-            Number of samples to be taken in the intervals.
+        sampling_points : FLOAT, optional
+            Number of samples to be taken in the intervals. The default is 100.
 
         Returns
         -------
@@ -114,6 +114,7 @@ class Quasiperiodic:
             Sampling points inside the resonators.
         pointsExt : ARRAY 
             Sampling points outside the resonators.
+            
         """
         kr = np.abs(self.k)
         if self.k==0:
@@ -148,6 +149,7 @@ class Quasiperiodic:
             Gives the function w_f of x.
         ai : ARRAY
             Vector of coefficients a_i and b_i of u(x) in each interval (x_i^+,x_{i+1}^-).
+            
         """
         assert len(f) == 2 * self.N, f"Need 2*N boundary condition, got {len(f)} instead of {2 * self.N}"
         if self.k == 0:
@@ -223,6 +225,7 @@ class Quasiperiodic:
         -------
         T: ARRAY
             The 2Nx2N matrix defining the Dirichlet-to-Neumann map.
+            
         """
         def Ak(l, k):
             return np.asarray([[-k* np.cos(k * l) / np.sin(k * l), k/ np.sin(k * l)],
@@ -250,6 +253,7 @@ class Quasiperiodic:
         -------
         A : ARRAY
             The 2(2M+1)Nx2(2M+1)N matrix as defined by (3.3).
+            
         """
         T = self.get_DirichletNeumann_matrix(alpha)
         T = -self.delta*T.dot(lg.block_diag(*([[np.exp(1j*self.kb[i]*self.xipmCol[i, 0]), np.exp(-1j*self.kb[i]*self.xipmCol[i, 0])],
@@ -269,11 +273,14 @@ class Quasiperiodic:
         ----------
         alpha : FLOAT
             Quasi wave number of the wave field.
+        sol : ARRAY, optional
+            The coefficients a_i^n, b_i^n of the solution v_n. The default is None.
 
         Returns
         -------
         utot: FUNCTION
             Total wave field solving the exterior problem.
+            
         """
         if sol is None:
             A = self.getMatcalA(alpha)
@@ -285,7 +292,7 @@ class Quasiperiodic:
                 if x >= xim and x <= xip:
                     return sol[2*i]*np.exp(1j*self.kb[i]*x)+sol[2*i+1]*np.exp(-1j*self.kb[i]*x) # Construct the function u as given in Lemma 3.1
 
-        f = [u(xi)-self.uin(xi) for xi in self.xipm] # Define boundary data
+        f = [u(xi)-self.uin(xi) for xi in self.xipm[:-1]] # Define boundary data
         ai, usext = self.wf(f) # Gives the vector of coefficients a_i, b_i and the function w_f(x) defined by (2.2)
 
         def utot(x):
@@ -302,7 +309,27 @@ class Quasiperiodic:
 
         return utot
     
-    def plot_u(self, alpha, animate=False,ylim=None,zoom=None):
+    def plot_u(self, alpha, animate=False, ylim=None, zoom=None):
+        """
+        Plots the solution u.
+
+        Parameters
+        ----------
+        alpha : FLOAT
+            Quasi wave number.
+        animate : TYPE, optional
+            DESCRIPTION. The default is False.
+        ylim : TYPE, optional
+            DESCRIPTION. The default is None.
+        zoom : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Returns
+        -------
+        line : TYPE
+            DESCRIPTION.
+
+        """
         fig = plt.figure()
         pointsInt, pointsExt = self.getPlottingPoints()
         if zoom:
@@ -367,7 +394,59 @@ class Quasiperiodic:
         plt.ylabel('$u^{\alpha}(x)$')
         fig.show()
         
-    def resonantfrequencies(self, v, vb, delta):
+    def get_capacitance_matrix(self, alpha):
+        """
+        Computes the capacitance matrix.
+
+        Parameters
+        ----------
+        alpha : FLOAT
+            Quasi wave number.
+
+        Returns
+        -------
+        C : ARRAY
+            Capacitance matrix.
+
+        """
+        C = np.zeros((self.N,self.N), dtype=complex)
+        for i in range(self.N):
+            for j in range(self.N):
+                if i == j-1:
+                    C[i,j] += 1/self.lij[i]
+                if i == j:
+                    C[i,j] += -(1/self.lij[j-1] + 1/self.lij[j])
+                if i == j+1:
+                    C[i,j] += 1/self.lij[j]
+                if (j == 0) and (i == self.N-1):
+                    C[i,j] += np.exp(1j*alpha*self.L)/self.lij[-1]
+                if (i == 0) and (j == self.N-1):
+                    C[i,j] += np.exp(-1j*alpha*self.L)/self.lij[-1]
+        self.C = -C
+        return -C
+        
+    def get_generalized_capacitance_matrix(self, alpha: float):
+        """
+        Computes the generalized capacitance matrix.
+
+        Parameters
+        ----------
+        alpha : SCALAR
+            Quasi wave number.
+
+        Returns
+        -------
+        Cgen : ARRAY
+            Generalized capacitance matrix.
+
+        """
+        V = np.diag(self.li)
+        S = np.diag(self.vb)
+        Cgen = -self.delta * S ** 2 @ np.linalg.inv(V) @ self.get_capacitance_matrix(alpha=alpha)
+        self.Cgen = Cgen
+        return Cgen
+        
+    def resonantfrequencies(self, v, vb, delta, alpha):
         """
         Taken from the static case, might need modifications later!
         
@@ -375,10 +454,12 @@ class Quasiperiodic:
         ----------
         v : SCALAR
             Wavespeed in the background medium.
-        vb : SCALAR
-            Wavespeed in the resonators.
+        vb : ARRAY
+            Array of wavespeeds in each resonator.
         delta : SCALAR
             Contrast parameter \rho_b/\rho.
+        alpha : SCALAR
+            Quasi wave number.
 
         Returns
         -------
@@ -388,34 +469,18 @@ class Quasiperiodic:
             A list of all modes.
 
         """
-        if self.N == 1:
-            freqs = np.array([-1j*vb[0]*np.log(1+2*vb[0]*delta/(v-vb[0]*delta))]) # Use the formula (3.28) for \omega_1(\delta)
-        else:
-            freqs = np.array([-1j*delta*2*vb[0]**2/(v*np.sum(self.li))]) # Use the formula (3.23) for \omega_1(\delta)
-        vmodes=np.array([1]*self.N) # By rmk 3.3 the mode associated to the zero frequency is 1
-        if self.N>1:
-            d1 = np.concatenate(([1/self.lij[0]],
-                                 1/self.lij[:-1]+1/self.lij[1:],[1/self.lij[-1]]))
-            d2 = -1/self.lij
-            C = np.diag(d1)+np.diag(d2,1)+np.diag(d2,-1) # Define matrix C as given by (1.13)
-            V = np.diag(self.li) # Define matrix V as given by (1.14)
-            Vhalf=np.sqrt(np.linalg.pinv(V)) # V^(-1/2)
-            lambdas, vmodes = np.linalg.eigh(Vhalf.dot(C).dot(Vhalf)) # Find the eigenvalues & -vectors of C
-            vmodes=Vhalf.dot(vmodes)
-
-            B=np.diag([1]+[0]*(self.N-2)+[1])
-            aiBai = np.diag(vmodes[:,1:].T.dot(B.dot(vmodes[:,1:])))
-            self.aiBai = aiBai
-            self.lambdas= lambdas
-            freqs = np.append(freqs,np.sqrt(delta)*vb[1:]*np.sqrt(lambdas[1:])
-                              -1j*delta*vb[1:]**2/(2*v)*aiBai) # Compute the remaining N-1 frequencies as given by (3.24)
-        else:
-            vmodes=vmodes[:,None]
-
-        return freqs, vmodes
+        
+        C_alpha = self.get_capacitance_matrix(alpha)
+        V = np.diag(self.li)
+        eigvals, eigvecs = np.linalg.eigh(np.linalg.pinv(V).dot(C_alpha))
+        pos_freqs = np.sqrt(delta)*np.multiply(vb, eigvals)
+        neg_freqs = -np.sqrt(delta)*np.multiply(vb, eigvals)
+        freqs = np.append(pos_freqs,neg_freqs)
+        return freqs
+        
 
     
-def muller(N, alpha, delta, vb, v, omega, li=None, lij=None):
+def muller(N, alpha, delta, vb, v, li=None, lij=None):
     """
     Apply Muller's method to find \omega such that the smallest eigenvalue of A(\omega,\delta)
     is zero. These values of \omega are exactly the desired resonant frequencies.
@@ -432,8 +497,6 @@ def muller(N, alpha, delta, vb, v, omega, li=None, lij=None):
         Wave speed inside the resonators.
     v : FLOAT
         Wave speed in the background medium.
-    omega : FLOAT
-        Frequency of the wave field.
     li : LIST, optional
         List of the lengths of each resonator (x_i^-,x_i^+). The default is None.
     lij : LIST, optional
@@ -443,9 +506,9 @@ def muller(N, alpha, delta, vb, v, omega, li=None, lij=None):
     -------
     roots: ARRAY
         An array containing all roots found by Muller's method based on three initial values.
+        
     """
     wavepb = Quasiperiodic(N, li, lij)
-    wavepb.setparams(v, vb, omega, delta, alpha)
     
     def f(omega):
         """
@@ -459,7 +522,8 @@ def muller(N, alpha, delta, vb, v, omega, li=None, lij=None):
         Returns
         ------
         SCALAR
-            Smallest eigenvalue associated to the given \omega.
+            Determinant of the matrix \mathcal{A} associated to the given \omega.
+            
         """
         wavepb.setparams(v, vb, omega, delta, alpha)
         
@@ -468,13 +532,11 @@ def muller(N, alpha, delta, vb, v, omega, li=None, lij=None):
         lamb, eigv = np.linalg.eig(A_matrix) # Compute eigenvalues and right eigenvectors
         order = np.argsort(np.abs(lamb)) # Indices of ordered eigenvalues
         wavepb.sol = eigv[:,order[0]]
-        
-        # return lamb[order[0]]
+
         return np.linalg.det(A_matrix)
         
 
-    freqs = np.linspace(0.1,1.5,num=1*wavepb.N)
-    # freqs, vmodes = wavepb.resonantfrequencies(v, vb, delta)
+    freqs = wavepb.resonantfrequencies(v, vb, delta, alpha)
     roots = []
     for i, omegai in enumerate(freqs):
         xk = [omegai*(1+0.01*np.exp(1j*k*2*np.pi/3)) for k in (0,1,2)] # Define an initial guess for Muller's method
@@ -531,37 +593,35 @@ def muller(N, alpha, delta, vb, v, omega, li=None, lij=None):
     return np.asarray(roots)
 
 
-N = 4
-delta = 0.1
-vb = np.array([1,2,1,2])
-v = 0.8 
-omega = np.sqrt(delta)
-O = 2*np.sqrt(delta) 
-li=[1]*N
-lij=[0.5]*(N-1)
+N = 2
+delta = 0.001
+vb = np.array([1, 1])
+v = 0.8
+
+li=[1,1]
+lij=[2,1]
 L = np.sum(li) + np.sum(lij)
-alpha = 0.001
 
 assert len(li) == N, f"There are {N} resonators, thus, li must have {N} elements and not {len(li)} elements."
-assert len(lij) == N-1, f"There are {N} resonators, thus, li must have {N-1} elements and not {len(lij)} elements."
+assert len(lij) == N, f"There are {N} resonators, thus, li must have {N} elements and not {len(lij)} elements."
+assert len(vb) == N, f"There are {N} resonators, thus, vb must have {N} elements and not {len(vb)} elements."
 
-# muller(N, alpha, delta, vb, v, n, omega, K, O, A, li, lij)
+# muller(N, alpha, delta, vb, v, li, lij)
 
 # Plot \omega_1 as a function od \delta
 sample_points = 100
 alphas = np.linspace(-np.pi / L, np.pi / L, sample_points)
-oms =np.zeros((sample_points,N), dtype=complex)
+oms =np.zeros((sample_points,2*N), dtype=complex)
 i = 0
 for alpha in alphas:
-    roots = muller(N, alpha, delta, vb, v, omega, li, lij)
+    roots = muller(N, alpha, delta, vb, v, li, lij)
     oms[i,:] += roots
     i += 1
 plt.close('all')
-# fig, ax = plt.subplots(1, figsize=(10, 7))
-for i in range(N):
-    fig, ax = plt.subplots(1, figsize=(10, 7))
-    ax.plot(alphas,np.real(oms[:,i]),'b-',label=f"Re$(\\omega_{i})$")
-    ax.plot(alphas,np.imag(oms[:,i]),'r-',label=f"Im$(\\omega_{i})$")
-    ax.legend()
-    ax.set_xlabel('$\\alpha$')
-    ax.set_ylabel('$\\omega_{i}^{\\alpha}$')
+
+fig, ax = plt.subplots(1, figsize=(10, 7))
+ax.plot(alphas,np.real(oms),'-',label='$\\omega_i$')
+# ax.plot(alphas,np.imag(oms),'r-',label='Im$(\\omega_i)$')
+ax.legend()
+ax.set_xlabel('$\\alpha$')
+ax.set_ylabel('$\\omega_i^{\\alpha}$')
