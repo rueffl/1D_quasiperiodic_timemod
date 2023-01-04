@@ -18,6 +18,7 @@ import sympy as sy
 import scipy.integrate as integrate
 import matplotlib.animation as animatio
 from scipy.integrate import solve_ivp
+import time
 
 animate = False
 
@@ -104,8 +105,7 @@ class kappa_rho_tdep:
             self.k = (self.omega+n*self.O)/self.v # Wave number in the background medium
             self.kb_n = (self.omega+n*self.O)/self.vb # Wave number in the resonators 
             self.uin = lambda x: np.exp(1j*self.k*x)  # Incomming wave field
-            # Derivative of incomming wave field
-            self.duin = lambda x: 1j*self.k*np.exp(1j*self.k*x)
+            self.duin = lambda x: 1j*self.k*np.exp(1j*self.k*x) # Derivative of incomming wave field
 
     def getPlottingPoints(self, sampling_points=100):
         """
@@ -113,8 +113,8 @@ class kappa_rho_tdep:
 
         Parameters
         ----------
-        sampling_points : FLOAT, default=100
-            Number of samples to be taken in the intervals.
+        sampling_points : FLOAT, optional
+            Number of samples to be taken in the intervals. The default is 100.
 
         Returns
         -------
@@ -342,8 +342,8 @@ class kappa_rho_tdep:
             The Fourier coefficients of 1/\kappa(t).
         alpha : FLOAT
             Quasi wave number of the wave field.
-        sol : ARRAY
-            2Nx1 array containing the coefficients a_i, b_i for all 1<=i<=N.
+        sol : ARRAY, optional
+            2Nx1 array containing the coefficients a_i, b_i for all 1<=i<=N. The default is None.
 
         Returns
         -------
@@ -552,6 +552,38 @@ class kappa_rho_tdep:
             A list of all modes.
 
         """
+        # if self.N == 1:
+        #     # Use the formula (3.28) for \omega_1(\delta)
+        #     freqs = np.array(
+        #         [-1j*vb[0]*np.log(1+2*vb[0]*delta/(v-vb[0]*delta))])
+        # else:
+        #     # Use the formula (3.23) for \omega_1(\delta)
+        #     freqs = np.array([-1j*delta*2*vb[0]**2/(v*np.sum(self.li))])
+        # # By rmk 3.3 the mode associated to the zero frequency is 1
+        # vmodes = np.array([1]*self.N)
+        # if self.N > 1:
+        #     # d1 = np.concatenate(([1/self.lij[0]],
+        #     #                      1/self.lij[:-1]+1/self.lij[1:],[1/self.lij[-1]]))
+        #     # d2 = -1/self.lij[:]
+        #     # C = np.diag(d1)+np.diag(d2,1)+np.diag(d2,-1) # Define matrix C as given by (1.13)
+        #     C = self.get_capacitance_matrix(alpha)
+        #     V = np.diag(self.li)  # Define matrix V as given by (1.14)
+        #     Vhalf = np.sqrt(np.linalg.pinv(V))  # V^(-1/2)
+        #     # Find the eigenvalues & -vectors of C
+        #     lambdas, vmodes = np.linalg.eigh(Vhalf.dot(C).dot(Vhalf))
+        #     vmodes = Vhalf.dot(vmodes)
+
+        #     B = np.diag([1]+[0]*(self.N-2)+[1])
+        #     aiBai = np.diag(vmodes[:, 1:].T.dot(B.dot(vmodes[:, 1:])))
+        #     self.aiBai = aiBai
+        #     self.lambdas = lambdas
+        #     freqs = np.append(freqs, np.sqrt(delta)*vb[1:]*np.sqrt(lambdas[1:])
+        #                       - 1j*delta*vb[1:]**2/(2*v)*aiBai)  # Compute the remaining N-1 frequencies as given by (3.24)
+        # else:
+        #     vmodes = vmodes[:, None]
+
+        # return freqs
+        
         def rhot(t):
             return 1 / (1 + epsilon_rho * np.cos(self.O * t + phi_rho))
 
@@ -588,6 +620,14 @@ class kappa_rho_tdep:
         freq = w_real.T
         
         return freq
+    
+        # C_alpha = self.get_capacitance_matrix(alpha)
+        # V = np.diag(self.li)
+        # eigvals, eigvecs = np.linalg.eigh(np.linalg.pinv(V).dot(C_alpha))
+        # pos_freqs = np.sqrt(delta)*np.multiply(vb, np.sqrt(eigvals))
+        # neg_freqs = -np.sqrt(delta)*np.multiply(vb, np.sqrt(eigvals))
+        # freqs = np.append(pos_freqs,neg_freqs)
+        # return freqs
 
 
 def muller(N, alpha, delta, vb, v, O, rs, ks, li=None, lij=None):
@@ -624,6 +664,8 @@ def muller(N, alpha, delta, vb, v, O, rs, ks, li=None, lij=None):
     -------
     roots: ARRAY
         An array containing all roots found by Muller's method based on three initial values.
+    run_time : ARRAY
+        An array containing the time it takes for Muller's method to compute the result.
         
     """
     wavepb = kappa_rho_tdep(N, li, lij)
@@ -657,12 +699,15 @@ def muller(N, alpha, delta, vb, v, O, rs, ks, li=None, lij=None):
 
     freqs = wavepb.resonantfrequencies(v, vb, delta, alpha)
     roots = []
+    run_time= []
     for i, omegai in enumerate(freqs):
         # Define an initial guess for Muller's method
         xk = [omegai*(1+0.01*np.exp(1j*k*2*np.pi/3)) for k in (0, 1, 2)]
         f(xk[0])
         # Root of f, i.e. \omega such that the smallest eigenvalue of A(\omega,\delta) is zero
+        start_time = time.time()
         root = muller2.muller(xk, f)
+        run_time.append(time.time()-start_time)
         print(f"Initial guess: {omegai}")
         print(f"Root found: {root}   Value: {np.abs(f(root))}")
         roots.append(root)
@@ -719,7 +764,7 @@ def muller(N, alpha, delta, vb, v, O, rs, ks, li=None, lij=None):
             f"Root {i} predicted - computed: ${re} {plus} {im}\\ii$ & ${rec} {plus} {imc}\\ii$", color="green"))
         print(colored(
             f"Root {i} predicted - computed: ${omegai}  & ${roots[i]}$", color="blue"))
-    return np.asarray(roots)
+    return np.asarray(roots), np.asarray(run_time)
 
 
 N = 2
@@ -728,7 +773,7 @@ vb = np.array([1, 1])
 v = 0.8
 O = 0.2
 
-epsilon_kappa = 0.1
+epsilon_kappa = 0.0001
 epsilon_rho = 0.1
 phi_rho = np.array([0, np.pi / 2])
 phi_kappa = np.array([0, np.pi / 2])
@@ -750,6 +795,7 @@ li = [1, 1]
 lij = [2, 1]
 L = np.sum(li) + np.sum(lij)
 T = 2*np.pi/O
+# alpha = 0.02
 
 assert len(rs) == len(ks), "The number of Fourier coefficients of 1/\rho(t) should be the same as the number of Fourier coefficients of 1/\kappa(t)"
 assert len(li) == N, f"There are {N} resonators, thus, li must have {N} elements and not {len(li)} elements."
@@ -760,17 +806,66 @@ assert len(lij) == N, f"There are {N} resonators, thus, li must have {N} element
 
 sample_points = 100
 alphas = np.linspace(-np.pi / L, np.pi / L, sample_points)
-oms =np.zeros((sample_points,2*N), dtype=complex)
+oms = np.zeros((sample_points,2*N), dtype=complex)
+guess = np.zeros((sample_points,2*N), dtype=complex)
+times = np.zeros((sample_points,2*N))
 i = 0
 for alpha in alphas:
-    roots = muller(N, alpha, delta, vb, v, O, rs, ks, li, lij)
+    wavepb = kappa_rho_tdep(N, li, lij)
+    wavepb.setparams(v, vb, O, delta, alpha, omega=None)
+    roots, run_time = muller(N, alpha, delta, vb, v, O, rs, ks, li, lij)
+    freqs = wavepb.resonantfrequencies(v, vb, delta, alpha)
     oms[i,:] += roots
+    guess[i,:] += freqs
+    times[i,:] += run_time
     i += 1
 plt.close('all')
 
 fig, ax = plt.subplots(1, figsize=(10, 7))
-ax.plot(alphas,np.real(oms),'-',label='$\\omega_i$')
-# ax.plot(alphas,np.imag(oms),'r-',label='Im$(\\omega_i)$')
-ax.legend()
-ax.set_xlabel('$\\alpha$')
-ax.set_ylabel('$\\omega_i^{\\alpha}$')
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+for i in range(0,2*N-1):
+    ax.plot(alphas, np.abs(np.real(oms[:,i])-np.real(guess[:,i])), 'b-', linewidth=2)
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('Error Real Part', fontsize=18)
+
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+for i in range(0,2*N-1):
+    ax.plot(alphas, np.abs(np.imag(oms[:,i])-np.imag(guess[:,i])), 'b-', linewidth=2)
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('Error Imaginary Part', fontsize=18)
+
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+# ax2 = ax.twinx()
+ax.plot(alphas, np.real(oms[:,0]), 'b-', linewidth=2, label='Re$(\\omega_i)$')
+ax.plot(alphas, np.real(oms[:,1:2*N]), 'b-', linewidth=2)
+ax.plot(alphas, np.real(guess[:,0]), 'r--', linewidth=2, label='Capacitance \nApproximation')
+ax.plot(alphas, np.real(guess[:,1:2*N]), 'r--', linewidth=2)
+# ax2.plot(alphas, np.imag(oms[:,0]), 'r-', linewidth=2, label='Im$(\\omega_i)$')
+# ax2.plot(alphas, np.imag(oms[:,1:2*N]), 'r-', linewidth=2)
+ax.legend(fontsize=18)
+# ax2.legend(fontsize=18)
+# ax2.set_ylim([-0.0006,0.0006])
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('Re$(\\omega_i^{\\alpha})$', fontsize=18)
+# ax2.set_ylabel('Im$(\\omega_i^{\\alpha})$', fontsize=18)
+
+# fig, ax = plt.subplots(1, figsize=(10, 7))
+# font = {'family' : 'normal',
+#         'weight': 'normal',
+#         'size'   : 14}
+# plt.rc('font', **font)
+# ax.plot(alphas,times,'-', linewidth=2) 
+# ax.legend(fontsize=18)
+# ax.set_xlabel('$\\alpha$', fontsize=18)
+# ax.set_ylabel('Run Time [s]', fontsize=18)
