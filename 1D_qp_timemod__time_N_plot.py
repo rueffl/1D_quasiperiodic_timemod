@@ -3,7 +3,11 @@
 """
 Created on Wed Dec 28 16:41:17 2022
 
-@author: rueffl
+@author: Liora Rueff
+
+The code produces a plot of the run time for each N when solving the problem "exactly" with Muller's method
+compared to the time it takes the capacitance matrix approximation to run. 
+Note that it takes a while for the code to run.
 """
 
 import numpy as np
@@ -738,17 +742,17 @@ def muller(N, alpha, delta, vb, v, O, rs, ks, li=None, lij=None):
     return np.asarray(roots), np.asarray(run_time), estimate_time
 
 
-N_max = 20
-delta = 0.001
+N_max = 11
+delta = 0.0001
 vb = np.array([1])
-v = 0.8
-O = 0.2
+v = 1
+O = 0.03
 li = [1]
-lij = [2]
+lij = [1]
 T = 2*np.pi/O
 
-epsilon_kappa = 0.1
-epsilon_rho = 0.1
+epsilon_kappa = 0.0001
+epsilon_rho = 0.0001
 phi_rho = np.array([0, np.pi / 2])
 phi_kappa = np.array([0, np.pi / 2])
 
@@ -764,14 +768,9 @@ estimate_times = np.zeros((N_max-2,1))
 for N in range(2,N_max):
     li = np.append(li,1)
     vb = np.append(vb,1)
-    if (N % 2) == 0:
-        phi_rho = np.append(phi_rho,np.pi/2)
-        phi_kappa = np.append(phi_kappa,np.pi/2)
-        lij.append(1)
-    else:
-        phi_rho = np.append(phi_rho,0)
-        phi_kappa = np.append(phi_kappa,0)
-        lij.append(2)
+    phi_rho = np.append(phi_rho,np.pi/N)
+    phi_kappa = np.append(phi_kappa,np.pi/N)
+    lij.append(1)
     L = np.sum(li) + np.sum(lij)
     rs = np.append(rs,[[epsilon_rho*np.exp(-1j*phi_rho[0]),1,epsilon_rho*np.exp(1j*phi_rho[0])]], axis=0)
     ks = np.append(ks,[[epsilon_kappa*np.exp(-1j*phi_kappa[0]),1,epsilon_kappa*np.exp(1j*phi_kappa[0])]], axis=0)
@@ -787,16 +786,53 @@ for N in range(2,N_max):
     times[N-2] += t
     estimate_times[N-2] += t_estimate
 
+## Plot results on normal axes
 fig, ax = plt.subplots(1, figsize=(10, 7))
 font = {'family' : 'normal',
         'weight': 'normal',
-        'size'   : 14}
+        'size'   : 16}
 plt.rc('font', **font)
 ax.plot(np.linspace(2,N_max-1,N_max-2),times[0:9],'b-', linewidth=2, label='Muller`s Method')
 ax.plot(np.linspace(2,N_max-1,N_max-2),estimate_times[0:9],'r-', linewidth=2, label='Capacitance Approximation')
 ax.legend(fontsize=18)
 ax.set_xlabel('$N$', fontsize=18)
 ax.set_ylabel('Run Time [s]', fontsize=18)
+
+## Plot results on logarithmic x-axis
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 16}
+plt.rc('font', **font)
+ax.plot(np.log10(np.linspace(2,N_max-1,N_max-2)),times[0:9],'b-', linewidth=2, label='Muller`s Method')
+ax.plot(np.log10(np.linspace(2,N_max-1,N_max-2)),estimate_times[0:9],'r-', linewidth=2, label='Capacitance Approximation')
+ax.legend(fontsize=18)
+ax.set_xlabel('$N$', fontsize=18)
+ax.set_ylabel('log(Run Time [s])', fontsize=18)
+
+## Plot results on logarithmic y-axis
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 16}
+plt.rc('font', **font)
+ax.plot(np.linspace(2,N_max-1,N_max-2),np.log10(times[0:9]),'b-', linewidth=2, label='Muller`s Method')
+ax.plot(np.linspace(2,N_max-1,N_max-2),np.log10(estimate_times[0:9]),'r-', linewidth=2, label='Capacitance Approximation')
+ax.legend(fontsize=18)
+ax.set_xlabel('log$(N)$', fontsize=18)
+ax.set_ylabel('Run Time [s]', fontsize=18)
+
+## Plot results on logarithmic axes
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 16}
+plt.rc('font', **font)
+ax.plot(np.log10(np.linspace(2,N_max-1,N_max-2)),np.log10(times[0:9]),'b-', linewidth=2, label='Muller`s Method')
+ax.plot(np.log10(np.linspace(2,N_max-1,N_max-2)),np.log10(estimate_times[0:9]),'r-', linewidth=2, label='Capacitance Approximation')
+ax.legend(fontsize=18)
+ax.set_xlabel('log$(N)$', fontsize=18)
+ax.set_ylabel('log(Run Time [s])', fontsize=18)
     
         
     
