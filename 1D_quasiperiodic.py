@@ -3,7 +3,9 @@
 """
 Created on Fri Dec  9 11:33:10 2022
 
-@author: rueffl
+@author: Liora Rueff
+
+Solves the 1D quasiperiodic static problem "exactly" using Muller's method.
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -473,8 +475,8 @@ class Quasiperiodic:
         C_alpha = self.get_capacitance_matrix(alpha)
         V = np.diag(self.li)
         eigvals, eigvecs = np.linalg.eigh(np.linalg.pinv(V).dot(C_alpha))
-        pos_freqs = np.sqrt(delta)*np.multiply(vb, eigvals)
-        neg_freqs = -np.sqrt(delta)*np.multiply(vb, eigvals)
+        pos_freqs = np.sqrt(delta)*np.multiply(vb, np.sqrt(eigvals))
+        neg_freqs = -np.sqrt(delta)*np.multiply(vb, np.sqrt(eigvals))
         freqs = np.append(pos_freqs,neg_freqs)
         return freqs
         
@@ -620,8 +622,12 @@ for alpha in alphas:
 plt.close('all')
 
 fig, ax = plt.subplots(1, figsize=(10, 7))
-ax.plot(alphas,np.real(oms),'-',label='$\\omega_i$')
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+ax.plot(alphas,np.real(oms),'b-', linewidth=2) # ,label='$\\omega_i$')
 # ax.plot(alphas,np.imag(oms),'r-',label='Im$(\\omega_i)$')
-ax.legend()
-ax.set_xlabel('$\\alpha$')
-ax.set_ylabel('$\\omega_i^{\\alpha}$')
+ax.legend(fontsize=18)
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('$\\omega_i^{\\alpha}$', fontsize=18)
