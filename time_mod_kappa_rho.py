@@ -308,23 +308,43 @@ class kappa_rho_tdep:
             return V
 
         A = np.zeros((int(2*M+1)*2*self.N, int(2*M+1)*2*self.N), dtype=np.complex)
-        G_m1 = G(n,1,rs)
-        G_0 = G(n,0,rs)
-        G_p1 = G(n,-1,rs)
-        V_m1 = V(n,1)
-        V_0 = V(n,0)
-        V_p1 = V(n,-1)
-        T_m1 = self.get_DirichletNeumann_matrix(alpha, n-1)
-        T_0 = self.get_DirichletNeumann_matrix(alpha, n)
-        T_p1 = self.get_DirichletNeumann_matrix(alpha, n+1)
+        # G_m1 = G(n,1,rs)
+        # G_0 = G(n,0,rs)
+        # G_p1 = G(n,-1,rs)
+        # V_m1 = V(n,1)
+        # V_0 = V(n,0)
+        # V_p1 = V(n,-1)
+        T_m1 = self.get_DirichletNeumann_matrix(alpha, -1)
+        T_0 = self.get_DirichletNeumann_matrix(alpha, 0)
+        T_p1 = self.get_DirichletNeumann_matrix(alpha, 1)
+        
+        G_nm1_m0 = G(-1,0,rs)
+        G_nm1_mm1 = G(-1,-1,rs)
+        G_n0_mp1 = G(0,1,rs)
+        G_n0_m0 = G(0,0,rs)
+        G_n0_mm1 = G(0,-1,rs)
+        G_np1_mp1 = G(1,1,rs)
+        G_np1_m0 = G(1,0,rs)
+        
+        V_nm1_m0 = V(-1,0)
+        V_n0_m0 = V(0,0)
+        V_np1_m0 = V(1,0)
+        
+        A[0*self.N:2*self.N, 0*self.N:2*self.N] = G_nm1_m0 - self.delta*T_m1.dot(V_nm1_m0)
+        A[0*self.N:2*self.N, 2*self.N:4*self.N] = G_nm1_mm1
+        A[2*self.N:4*self.N, 0*self.N:2*self.N] = G_n0_mp1
+        A[2*self.N:4*self.N, 2*self.N:4*self.N] = G_n0_m0 - self.delta*T_0.dot(V_n0_m0)
+        A[2*self.N:4*self.N, 4*self.N:6*self.N] = G_n0_mm1
+        A[4*self.N:6*self.N, 2*self.N:4*self.N] = G_np1_mp1
+        A[4*self.N:6*self.N, 4*self.N:6*self.N] = G_np1_m0 - self.delta*T_p1.dot(V_np1_m0)
 
-        A[0*self.N:2*self.N, 4*self.N:6*self.N] = G_m1 - self.delta*T_p1.dot(V_m1)
-        A[2*self.N:4*self.N, 2*self.N:4*self.N] = G_0 - self.delta*T_0.dot(V_0)
-        A[4*self.N:6*self.N, 0*self.N:2*self.N] = G_p1 - self.delta*T_p1.dot(V_p1)
-        A[0*self.N:2*self.N, 2*self.N:4*self.N] = G_0
-        A[2*self.N:4*self.N, 0*self.N:2*self.N] = G_p1
-        A[2*self.N:4*self.N, 4*self.N:6*self.N] = G_m1
-        A[4*self.N:6*self.N, 2*self.N:4*self.N] = G_0
+        # A[0*self.N:2*self.N, 4*self.N:6*self.N] = G_m1 - self.delta*T_p1.dot(V_m1)
+        # A[2*self.N:4*self.N, 2*self.N:4*self.N] = G_0 - self.delta*T_0.dot(V_0)
+        # A[4*self.N:6*self.N, 0*self.N:2*self.N] = G_p1 - self.delta*T_p1.dot(V_p1)
+        # A[0*self.N:2*self.N, 2*self.N:4*self.N] = G_0
+        # A[2*self.N:4*self.N, 0*self.N:2*self.N] = G_p1
+        # A[2*self.N:4*self.N, 4*self.N:6*self.N] = G_m1
+        # A[4*self.N:6*self.N, 2*self.N:4*self.N] = G_0
 
         if (A[2*self.N:4*self.N, 0*self.N:2*self.N] == np.zeros((2*self.N, 2*self.N))).all():
             if (A[2*self.N:4*self.N, 4*self.N:6*self.N] == np.zeros((2*self.N, 2*self.N))).all():
@@ -632,6 +652,68 @@ class kappa_rho_tdep:
         neg_freqs = -np.sqrt(delta)*np.multiply(vb, np.sqrt(eigvals))
         freqs = np.append(pos_freqs,neg_freqs)
         return freqs
+    
+    def get_approximations(self, v, vb, delta, alpha):
+        """
+        Taken from the static case, might need modifications later!
+
+        Parameters
+        ----------
+        v : SCALAR
+            Wavespeed in the background medium.
+        vb : SCALAR
+            Wavespeed in the resonators.
+        delta : SCALAR
+            Contrast parameter \rho_b/\rho.
+        alpha : INTEGER
+            Quasi wave number.
+
+        Returns
+        -------
+        freqs : ARRAY
+            A list of all frequencies \omega_i, for i=1,...,N.
+        vmodes : ARRAY
+            A list of all modes.
+
+        """
+        def rhot(t):
+            return 1 / (1 + epsilon_rho * np.cos(self.O * t + phi_rho))
+
+
+        def sqrtkappa(t):
+            return 1 / np.sqrt(1 + epsilon_kappa * np.cos(self.O * t + phi_kappa))
+
+
+        def w3(t):
+            return self.O**2/4*(1+((epsilon_kappa**2-1)/(1+epsilon_kappa*np.cos(self.O*t+phi_kappa))**2))
+
+
+        def build_MM(C, t):
+            Rho = np.diag(rhot(t))
+            Rinv = np.diag(1 / rhot(t))
+            K = np.diag(sqrtkappa(t))
+            W3 = np.diag(w3(t))
+            M = delta * vb[0] / self.li[0] * K @ Rho @ C @K @ Rinv + W3
+            MM = np.block([[np.zeros((self.N, self.N), dtype=complex), np.identity(self.N, dtype=complex)], [-M, np.zeros((self.N, self.N), dtype=complex)]])
+            return MM
+        # Compute the band functions
+
+        C = self.get_generalized_capacitance_matrix(alpha)
+        I_N = np.identity(2 * self.N, dtype=complex)
+        W = np.zeros((2*self.N,2*self.N), dtype=complex)
+        def F(t,y):
+            return build_MM(C, t)@y
+        for l in range(2 * self.N):
+            sol = solve_ivp(F, [0, T], I_N[:, l],t_eval=[T])
+            y1 = sol.y
+            W[:,l] = y1.T
+        w,v = np.linalg.eig(W)
+        # w_real = np.sort(np.real(np.log(w)/1j/T))
+        # freq = w_real.T
+        w_reim = np.sort((np.log(w)/1j/T))
+        freq = w_reim.T
+        
+        return freq
 
 
 def muller(N, alpha, delta, vb, v, O, rs, ks, li=None, lij=None):
@@ -768,36 +850,37 @@ def muller(N, alpha, delta, vb, v, O, rs, ks, li=None, lij=None):
             f"Root {i} predicted - computed: ${re} {plus} {im}\\ii$ & ${rec} {plus} {imc}\\ii$", color="green"))
         print(colored(
             f"Root {i} predicted - computed: ${omegai}  & ${roots[i]}$", color="blue"))
-    return np.asarray(roots), np.asarray(run_time)
+    return np.sort(np.asarray(roots)), np.asarray(run_time)
 
 
-N = 3
+
+N = 2
 delta = 0.0001
-vb = np.array([1, 1, 1])
+vb = np.array([1, 1])
 v = 1
 O = 0.03
 alpha = 0.02
 
-epsilon_kappa = 0.0001
+epsilon_kappa = 0.00001
 epsilon_rho = 0.00001
-phi_rho = np.array([0, np.pi / 2, 0])
-phi_kappa = np.array([0, np.pi / 2, 0])
+phi_rho = np.array([0, np.pi / 2])
+phi_kappa = np.array([0, np.pi / 2])
 
 rs = np.zeros((N,3),dtype=complex)
 ks = np.zeros((N,3),dtype=complex)
 rs[0,:] += epsilon_rho*np.exp(-1j*phi_rho[0]),1,epsilon_rho*np.exp(1j*phi_rho[0])
 rs[1,:] += epsilon_rho*np.exp(-1j*phi_rho[1]),1,epsilon_rho*np.exp(1j*phi_rho[1])
-rs[2,:] += epsilon_rho*np.exp(-1j*phi_rho[2]),1,epsilon_rho*np.exp(1j*phi_rho[2])
+# rs[2,:] += epsilon_rho*np.exp(-1j*phi_rho[2]),1,epsilon_rho*np.exp(1j*phi_rho[2])
 # rs[3,:] += epsilon_rho*np.exp(-1j*phi_rho[3]),1,epsilon_rho*np.exp(1j*phi_rho[3])
 # rs[4,:] += epsilon_rho*np.exp(-1j*phi_rho[4]),1,epsilon_rho*np.exp(1j*phi_rho[4])
-ks[0,:] += epsilon_kappa*np.exp(-1j*phi_kappa[0]),1,epsilon_rho*np.exp(1j*phi_kappa[0])
-ks[1,:] += epsilon_kappa*np.exp(-1j*phi_kappa[1]),1,epsilon_rho*np.exp(1j*phi_kappa[1])
-ks[2,:] += epsilon_kappa*np.exp(-1j*phi_kappa[2]),1,epsilon_rho*np.exp(1j*phi_kappa[2])
-# ks[3,:] += epsilon_kappa*np.exp(-1j*phi_kappa[3]),1,epsilon_rho*np.exp(1j*phi_kappa[3])
-# ks[4,:] += epsilon_kappa*np.exp(-1j*phi_kappa[4]),1,epsilon_rho*np.exp(1j*phi_kappa[4])
+ks[0,:] += epsilon_kappa*np.exp(-1j*phi_kappa[0]),1,epsilon_kappa*np.exp(1j*phi_kappa[0])
+ks[1,:] += epsilon_kappa*np.exp(-1j*phi_kappa[1]),1,epsilon_kappa*np.exp(1j*phi_kappa[1])
+# ks[2,:] += epsilon_kappa*np.exp(-1j*phi_kappa[2]),1,epsilon_kappa*np.exp(1j*phi_kappa[2])
+# ks[3,:] += epsilon_kappa*np.exp(-1j*phi_kappa[3]),1,epsilon_kappa*np.exp(1j*phi_kappa[3])
+# ks[4,:] += epsilon_kappa*np.exp(-1j*phi_kappa[4]),1,epsilon_kappa*np.exp(1j*phi_kappa[4])
 
-li = [1, 1, 1]
-lij = [1, 1, 1]
+li = [1, 1]
+lij = [1,  1]
 L = np.sum(li) + np.sum(lij)
 T = 2*np.pi/O
 # alpha = 0.02
@@ -807,134 +890,137 @@ assert len(li) == N, f"There are {N} resonators, thus, li must have {N} elements
 assert len(lij) == N, f"There are {N} resonators, thus, li must have {N} elements and not {len(lij)} elements."
 
 
-muller(N, alpha, delta, vb, v, O, rs, ks, li, lij)
+# muller(N, alpha, delta, vb, v, O, rs, ks, li, lij)
 
-# sample_points = 100
-# alphas = np.linspace(-np.pi / L, np.pi / L, sample_points)
-# oms = np.zeros((sample_points,2*N), dtype=complex)
-# guess = np.zeros((sample_points,2*N), dtype=complex)
-# times = np.zeros((sample_points,2*N))
-# i = 0
-# for alpha in alphas:
-#     wavepb = kappa_rho_tdep(N, li, lij)
-#     wavepb.setparams(v, vb, O, delta, alpha, omega=None)
-#     roots, run_time = muller(N, alpha, delta, vb, v, O, rs, ks, li, lij)
-#     freqs = wavepb.resonantfrequencies(v, vb, delta, alpha)
-#     oms[i,:] += roots
-#     guess[i,:] += freqs
-#     times[i,:] += run_time
-#     i += 1
-# plt.close('all')
+sample_points = 100
+alphas = np.linspace(-np.pi / L, np.pi / L, sample_points)
+oms = np.zeros((sample_points,2*N), dtype=complex)
+guess = np.zeros((sample_points,2*N), dtype=complex)
+times = np.zeros((sample_points,2*N))
+i = 0
+for alpha in alphas:
+    wavepb = kappa_rho_tdep(N, li, lij)
+    wavepb.setparams(v, vb, O, delta, alpha, omega=None)
+    roots, run_time = muller(N, alpha, delta, vb, v, O, rs, ks, li, lij)
+    freqs = wavepb.get_approximations(v, vb, delta, alpha)
+    oms[i,:] += roots
+    guess[i,:] += freqs
+    times[i,:] += run_time
+    i += 1
+plt.close('all')
 
-# ## Compute relative error
-# err = np.max(np.linalg.norm(oms-freqs)/np.linalg.norm(oms))
-# # err = np.max(np.sqrt((np.sum(np.real(oms-freqs))**2+np.sum(np.imag(oms-freqs))**2))/np.sqrt((np.sum(np.real(oms))**2+np.sum(np.imag(oms))**2)))
 
-# ## Create Plot of error of real part
-# fig, ax = plt.subplots(1, figsize=(10, 7))
-# font = {'family' : 'normal',
-#         'weight': 'normal',
-#         'size'   : 14}
-# plt.rc('font', **font)
-# for i in range(0,2*N-1):
-#     ax.plot(alphas, np.abs(np.real(oms[:,i])-np.real(guess[:,i])), 'b-', linewidth=2)
-# ax.set_xlabel('$\\alpha$', fontsize=18)
-# ax.set_ylabel('Error Real Part', fontsize=18)
 
-# ## Create Plot of error of imaginary part
-# fig, ax = plt.subplots(1, figsize=(10, 7))
-# font = {'family' : 'normal',
-#         'weight': 'normal',
-#         'size'   : 14}
-# plt.rc('font', **font)
-# for i in range(0,2*N-1):
-#     ax.plot(alphas, np.abs(np.imag(oms[:,i])-np.imag(guess[:,i])), 'b-', linewidth=2)
-# ax.set_xlabel('$\\alpha$', fontsize=18)
+## Compute relative error
+# err = np.mean(np.linalg.norm(oms-guess)/np.linalg.norm(oms))
+# err = np.max(np.sqrt((np.sum(np.real(oms-freqs))**2+np.sum(np.imag(oms-freqs))**2))/np.sqrt((np.sum(np.real(oms))**2+np.sum(np.imag(oms))**2)))
+err = np.max(np.amax(np.sqrt(np.real(oms-guess)**2+np.imag(oms-guess)**2)/np.sqrt(np.real(oms)**2+np.imag(oms)**2), axis=1))
+
+## Create Plot of error of real part
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+for i in range(0,2*N-1):
+    ax.plot(alphas, np.abs(np.real(oms[:,i])-np.real(guess[:,i])), 'b-', linewidth=2)
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('Error Real Part', fontsize=18)
+
+## Create Plot of error of imaginary part
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+for i in range(0,2*N-1):
+    ax.plot(alphas, np.abs(np.imag(oms[:,i])-np.imag(guess[:,i])), 'b-', linewidth=2)
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('Error Imaginary Part', fontsize=18)
+
+## Create Plot of relative error of imaginary part
 # ax.set_ylabel('Error Imaginary Part', fontsize=18)
-
-# ## Create Plot of relative error of imaginary part
-# # ax.set_ylabel('Error Imaginary Part', fontsize=18)
-# # fig, ax = plt.subplots(1, figsize=(10, 7))
-# # font = {'family' : 'normal',
-# #         'weight': 'normal',
-# #         'size'   : 14}
-# # plt.rc('font', **font)
-# # for i in range(0,2*N-1):
-# #     im_rel_error = np.divide((np.imag(guess[:,i])-np.imag(oms[:,i])),np.imag(oms[:,i]))
-# #     ax.plot(alphas,im_rel_error,'b-',linewidth=2)
-# # ax.set_xlabel('$\\alpha$', fontsize=18)
-# # ax.set_ylabel('Relative Error Imaginary Part', fontsize=18)
-
-# ## Create plot of Re(\omega) calculated with Muller's method compared to those calculated by the capacitance matrix
 # fig, ax = plt.subplots(1, figsize=(10, 7))
 # font = {'family' : 'normal',
 #         'weight': 'normal',
 #         'size'   : 14}
 # plt.rc('font', **font)
-# ax.plot(alphas, np.real(oms[:,0]), 'b-', linewidth=2, label='Muller`s Method')
-# ax.plot(alphas, np.real(oms[:,1:2*N]), 'b-', linewidth=2)
-# ax.plot(alphas, np.real(guess[:,0]), 'r--', linewidth=2, label='Capacitance \nApproximation')
-# ax.plot(alphas, np.real(guess[:,1:2*N]), 'r--', linewidth=2)
-# ax.legend(fontsize=18,loc=1)
+# for i in range(0,2*N-1):
+#     im_rel_error = np.divide((np.imag(guess[:,i])-np.imag(oms[:,i])),np.imag(oms[:,i]))
+#     ax.plot(alphas,im_rel_error,'b-',linewidth=2)
 # ax.set_xlabel('$\\alpha$', fontsize=18)
-# ax.set_ylabel('Re$(\\omega_i^{\\alpha})$', fontsize=18)
+# ax.set_ylabel('Relative Error Imaginary Part', fontsize=18)
 
-# ## Create plot of Im(\omega) calculated with Muller's method compared to those calculated by the capacitance matrix
-# fig, ax = plt.subplots(1, figsize=(10, 7))
-# font = {'family' : 'normal',
-#         'weight': 'normal',
-#         'size'   : 14}
-# plt.rc('font', **font)
-# ax.plot(alphas, np.imag(oms[:,0]), 'b-', linewidth=2, label='Muller`s Method')
-# ax.plot(alphas, np.imag(oms[:,1:2*N]), 'b-', linewidth=2)
-# ax.plot(alphas, np.imag(guess[:,0]), 'r--', linewidth=2, label='Capacitance \nApproximation')
-# ax.plot(alphas, np.imag(guess[:,1:2*N]), 'r--', linewidth=2)
-# ax.legend(fontsize=18,loc=1)
-# ax.set_xlabel('$\\alpha$', fontsize=18)
-# ax.set_ylabel('Im$(\\omega_i^{\\alpha})$', fontsize=18)
+## Create plot of Re(\omega) calculated with Muller's method compared to those calculated by the capacitance matrix
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+ax.plot(alphas, np.real(oms[:,0]), 'b-', linewidth=2, label='Muller`s Method')
+ax.plot(alphas, np.real(oms[:,1:2*N]), 'b-', linewidth=2)
+ax.plot(alphas, np.real(guess[:,0]), 'r--', linewidth=2, label='Capacitance \nApproximation')
+ax.plot(alphas, np.real(guess[:,1:2*N]), 'r--', linewidth=2)
+ax.legend(fontsize=18,loc=1)
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('Re$(\\omega_i^{\\alpha})$', fontsize=18)
 
-# ## Create plot of Re(\omega) and Im(\omega) calculated with Muller's method 
-# fig, ax = plt.subplots(1, figsize=(10, 7))
-# font = {'family' : 'normal',
-#         'weight': 'normal',
-#         'size'   : 14}
-# plt.rc('font', **font)
-# ax.plot(alphas, np.real(oms[:,0]), 'b-', linewidth=2, label='Re$(\\omega_i)$')
-# ax.plot(alphas, np.real(oms[:,1:2*N]), 'b-', linewidth=2)
-# ax.plot(alphas, np.imag(oms[:,0]), 'r-', linewidth=2, label='Im$(\\omega_i)$')
-# ax.plot(alphas, np.imag(oms[:,1:2*N]), 'r-', linewidth=2)
-# ax.legend(fontsize=18)
-# ax.set_xlabel('$\\alpha$', fontsize=18)
-# ax.set_ylabel('Re$(\\omega_i^{\\alpha})$ and Im$(\\omega_i^{\\alpha})$', fontsize=18)
+## Create plot of Im(\omega) calculated with Muller's method compared to those calculated by the capacitance matrix
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+ax.plot(alphas, np.imag(oms[:,0]), 'b-', linewidth=2, label='Muller`s Method')
+ax.plot(alphas, np.imag(oms[:,1:2*N]), 'b-', linewidth=2)
+ax.plot(alphas, np.imag(guess[:,0]), 'r--', linewidth=2, label='Capacitance \nApproximation')
+ax.plot(alphas, np.imag(guess[:,1:2*N]), 'r--', linewidth=2)
+ax.legend(fontsize=18,loc=1)
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('Im$(\\omega_i^{\\alpha})$', fontsize=18)
 
-# ## Create plot of \omega calculated with Muller's method and the capacitance matrix
-# fig, ax = plt.subplots(1, figsize=(10, 7))
-# font = {'family' : 'normal',
-#         'weight': 'normal',
-#         'size'   : 16}
-# plt.rc('font', **font)
-# ax.plot(alphas, np.real(oms[:,0]), '-', color='blue', linewidth=2, label='Muller`s Method \n(Real Part)')
-# ax.plot(alphas, np.real(oms[:,1:2*N]), '-', color='blue', linewidth=2)
-# ax.plot(alphas, np.real(guess[:,0]), '--', color='cyan', linewidth=2, label='Capacitance \nApproximation \n(Real Part)')
-# ax.plot(alphas, np.real(guess[:,1:2*N]), '--', color='cyan', linewidth=2)
-# ax.plot(alphas, np.imag(oms[:,0]), '-', color='red', linewidth=2, label='Muller`s Method \n(Imaginary Part)')
-# ax.plot(alphas, np.imag(oms[:,1:2*N]), '-', color='red', linewidth=2)
-# ax.plot(alphas, np.imag(guess[:,0]), '--', color='orange', linewidth=2, label='Capacitance \nApproximation \n(Imaginary Part)')
-# ax.plot(alphas, np.imag(guess[:,1:2*N]), '--', color='orange', linewidth=2)
-# ax.legend(fontsize=20,loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=4)
-# ax.set_xlabel('$\\alpha$', fontsize=20)
-# ax.set_ylabel('$\\omega_i^{\\alpha}$', fontsize=20)
+## Create plot of Re(\omega) and Im(\omega) calculated with Muller's method 
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+ax.plot(alphas, np.real(oms[:,0]), 'b-', linewidth=2, label='Re$(\\omega_i^{\\alpha})$')
+ax.plot(alphas, np.real(oms[:,1:2*N]), 'b-', linewidth=2)
+ax.plot(alphas, np.imag(oms[:,0]), 'r-', linewidth=2, label='Im$(\\omega_i^{\\alpha})$')
+ax.plot(alphas, np.imag(oms[:,1:2*N]), 'r-', linewidth=2)
+ax.legend(fontsize=18)
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('Re$(\\omega_i^{\\alpha})$ resp. Im$(\\omega_i^{\\alpha})$', fontsize=18)
 
-# ## Create plot of run time
-# fig, ax = plt.subplots(1, figsize=(10, 7))
-# font = {'family' : 'normal',
-#         'weight': 'normal',
-#         'size'   : 14}
-# plt.rc('font', **font)
-# ax.plot(alphas,times,'-', linewidth=2) 
-# ax.legend(fontsize=18)
-# ax.set_xlabel('$\\alpha$', fontsize=18)
-# ax.set_ylabel('Run Time [s]', fontsize=18)
+## Create plot of \omega calculated with Muller's method and the capacitance matrix
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 16}
+plt.rc('font', **font)
+ax.plot(alphas, np.real(oms[:,0]), '-', color='blue', linewidth=2, label='Muller`s Method \n(Real Part)')
+ax.plot(alphas, np.real(oms[:,1:2*N]), '-', color='blue', linewidth=2)
+ax.plot(alphas, np.real(guess[:,0]), '--', color='cyan', linewidth=2, label='Capacitance \nApproximation \n(Real Part)')
+ax.plot(alphas, np.real(guess[:,1:2*N]), '--', color='cyan', linewidth=2)
+ax.plot(alphas, np.imag(oms[:,0]), '-', color='red', linewidth=2, label='Muller`s Method \n(Imaginary Part)')
+ax.plot(alphas, np.imag(oms[:,1:2*N]), '-', color='red', linewidth=2)
+ax.plot(alphas, np.imag(guess[:,0]), '--', color='orange', linewidth=2, label='Capacitance \nApproximation \n(Imaginary Part)')
+ax.plot(alphas, np.imag(guess[:,1:2*N]), '--', color='orange', linewidth=2)
+ax.legend(fontsize=20,loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=4)
+ax.set_xlabel('$\\alpha$', fontsize=20)
+ax.set_ylabel('$\\omega_i^{\\alpha}$', fontsize=20)
+
+## Create plot of run time
+fig, ax = plt.subplots(1, figsize=(10, 7))
+font = {'family' : 'normal',
+        'weight': 'normal',
+        'size'   : 14}
+plt.rc('font', **font)
+ax.plot(alphas,times,'-', linewidth=2) 
+ax.legend(fontsize=18)
+ax.set_xlabel('$\\alpha$', fontsize=18)
+ax.set_ylabel('Run Time [s]', fontsize=18)
 
     
     
