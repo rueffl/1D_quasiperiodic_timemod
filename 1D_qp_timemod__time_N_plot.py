@@ -792,8 +792,8 @@ font = {'family' : 'normal',
         'weight': 'normal',
         'size'   : 16}
 plt.rc('font', **font)
-ax.plot(np.linspace(2,N_max-1,N_max-2),times[0:9],'b-', linewidth=2, label='Muller`s Method')
-ax.plot(np.linspace(2,N_max-1,N_max-2),estimate_times[0:9],'r-', linewidth=2, label='Capacitance Approximation')
+ax.plot(np.linspace(2,N_max-1,N_max-2),times[0:9],'b--x', linewidth=2, label='Muller`s Method', markersize=12)
+ax.plot(np.linspace(2,N_max-1,N_max-2),estimate_times[0:9],'r--x', linewidth=2, label='Capacitance Approximation', markersize=12)
 ax.legend(fontsize=18)
 ax.set_xlabel('$N$', fontsize=18)
 ax.set_ylabel('Run Time [s]', fontsize=18)
