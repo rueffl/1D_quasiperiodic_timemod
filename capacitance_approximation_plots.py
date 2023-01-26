@@ -19,7 +19,7 @@ import utils
 
 # Define the structure
 li = [1, 1, 1]
-lij = [1, 1, 1]
+lij = [1, 1, 2]
 N = 3
 delta = 0.0001
 vb = [1, 1, 1]
@@ -34,7 +34,7 @@ pwp = utils.PeriodicWaveProblem(N=N,
                                 delta=delta)
 L = np.sum(li) + np.sum(lij)
 # Define the time modulation
-epsr = 0.2
+epsr = 0
 epsk = 0
 Omega = 0.03
 T = 2 * np.pi / Omega
@@ -97,23 +97,24 @@ font = {'family' : 'normal',
         'weight': 'normal',
         'size'   : 14}
 plt.rc('font', **font)
+alphas_imag = alphas
 # for i in range(28,33):
-#     freq_imag = np.delete(freq_imag,28,axis=1)
+#     # freq_imag = np.delete(freq_imag,28,axis=1)
 #     freq_real = np.delete(freq_real,28,axis=1)
 #     alphas = np.delete(alphas,28)
-#     freq_imag = np.delete(freq_imag,-29,axis=1)
+#     # freq_imag = np.delete(freq_imag,-29,axis=1)
 #     freq_real = np.delete(freq_real,-29,axis=1)
 #     alphas = np.delete(alphas,-29)
 #     N_alpha -= 2
 for k in range(N,2*N):
     if k == N:
         ax.plot(alphas, freq_real[k, :], 'b-', linewidth=2, label='Re$(\\omega_{i}^{\\alpha})$')
-        ax.plot(alphas, freq_imag[k, :],'r-', linewidth=2, label='Im$(\\omega_{i}^{\\alpha})$')
-        ax.plot(alphas, freq_imag[k-N, :],'r-', linewidth=2)
+        ax.plot(alphas_imag, freq_imag[k, :],'r.', linewidth=2, label='Im$(\\omega_{i}^{\\alpha})$')
+        ax.plot(alphas_imag, freq_imag[k-N, :],'r.', linewidth=2)
     else:
         ax.plot(alphas, freq_real[k, :], 'b-', linewidth=2)
-        ax.plot(alphas, freq_imag[k, :],'r-', linewidth=2)
-        ax.plot(alphas, freq_imag[k-N, :],'r-', linewidth=2)
+        ax.plot(alphas_imag, freq_imag[k, :],'r.', linewidth=2)
+        ax.plot(alphas_imag, freq_imag[k-N, :],'r.', linewidth=2)
     if k != 2*N-1:
         if epsr != 0:
             if (k-N)%2 == 0:
